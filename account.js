@@ -45,7 +45,7 @@ async function readOnline(){
 }
 let loaded=false;
 async function saveOnline(next){
- if(!loaded){alert('Abra Minha conta e recarregue seu planejamento antes de editar.');return false}
+ if(!loaded){await notifyUser('Abra Minha conta e recarregue seu planejamento antes de editar.');return false}
  accountBusy=true;
  try{
   const token=await currentToken(),data={revision:revision+1,plan:next};
@@ -55,8 +55,8 @@ async function saveOnline(next){
   if(!rows?.length){const err=new Error('Conflito');err.status=409;throw err}
   revision=rows[0].revision;state=next;return true;
  }catch(err){
-  if(err.status===409){alert('Outro dispositivo salvou uma alteração. A versão mais recente será carregada. Confira os dados e repita sua edição.');try{await readOnline()}catch{loaded=false}}
-  else alert('Não foi possível confirmar o salvamento na conta. Verifique a conexão e tente novamente.');
+  if(err.status===409){await notifyUser('Outro dispositivo salvou uma alteração. A versão mais recente será carregada. Confira os dados e repita sua edição.');try{await readOnline()}catch{loaded=false}}
+  else await notifyUser('Não foi possível confirmar o salvamento na conta. Verifique a conexão e tente novamente.');
   return false;
  }finally{accountBusy=false}
 }
@@ -89,7 +89,7 @@ accountDialog.addEventListener('click',async e=>{
  if(act==='import'){
   const local=init();
   if(!validateBackup(local))return accountPanel('A lista local não pôde ser lida.');
-  if(!confirm('Substituir o planejamento da conta '+accountSession.email+' pela lista deste navegador ('+local.items.length+' produtos)?'))return;
+  if(!await confirmChange('Importar lista local?', 'Os '+local.items.length+' produtos deste navegador vão substituir o planejamento de '+accountSession.email+'.', 'Substituir planejamento'))return;
   if(await saveOnline(local)){render();accountPanel('Lista importada para a conta.')}return;
  }
  await accountTask(async()=>{
