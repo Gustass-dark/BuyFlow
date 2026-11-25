@@ -1,5 +1,38 @@
 'use strict';
 const $=s=>document.querySelector(s);
+function showMessage({title, message, confirmLabel='Entendi', cancellable=false, danger=false, inputValue=null}){
+ const dialog=document.createElement('dialog');
+ dialog.className='feedback-dialog';
+ dialog.setAttribute('aria-labelledby','feedback-title');
+ dialog.setAttribute('aria-describedby','feedback-copy');
+ dialog.innerHTML='<form method="dialog"><span class="feedback-icon" aria-hidden="true"></span><h2 id="feedback-title"></h2><p id="feedback-copy"></p><label hidden>Nome da categoria<input type="text" required></label><div class="feedback-actions"><button type="button" class="cancel">Cancelar</button><button class="accept"></button></div></form>';
+ const form=dialog.querySelector('form'), input=form.querySelector('input');
+ const cancel=form.querySelector('.cancel'), accept=form.querySelector('.accept');
+ dialog.querySelector('h2').textContent=title;
+ dialog.querySelector('p').textContent=message;
+ dialog.querySelector('.feedback-icon').textContent=danger?'!':inputValue!==null?'✎':'i';
+ dialog.classList.toggle('danger',danger);
+ input.disabled=inputValue===null;
+ input.closest('label').hidden=input.disabled;
+ input.value=inputValue??'';
+ cancel.hidden=!cancellable;
+ accept.textContent=confirmLabel;
+ cancel.onclick=()=>dialog.close();
+ form.onsubmit=e=>{e.preventDefault();dialog.close('accepted')};
+ document.body.append(dialog);
+ return new Promise(resolve=>{
+  dialog.addEventListener('close',()=>{
+   const accepted=dialog.returnValue==='accepted';
+   dialog.remove();
+   resolve(inputValue===null?accepted:accepted?input.value:null);
+  },{once:true});
+  dialog.showModal();
+  (inputValue!==null?input:cancellable?cancel:accept).focus();
+  if(inputValue!==null)input.select();
+ });
+}
+const notifyUser=message=>showMessage({title:'Confira os dados',message});
+const confirmChange=(title,message,confirmLabel)=>showMessage({title,message,confirmLabel,cancellable:true,danger:true});
 const money=n=>n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=()=>new Date().toLocaleDateString('sv-SE');
@@ -19,7 +52,7 @@ function init(){
  return {version:2,cats:[...categories],items,budgets:{}};
 }
 let state=init();
-async function save(next){if(accountBusy)return false;if(accountSession)return saveOnline(next);try{localStorage.setItem(key,JSON.stringify(next));state=next;return true}catch{alert('Não foi possível salvar. Verifique o espaço disponível no navegador.');return false}}
+async function save(next){if(accountBusy)return false;if(accountSession)return saveOnline(next);try{localStorage.setItem(key,JSON.stringify(next));state=next;return true}catch{await notifyUser('Não foi possível salvar. Verifique o espaço disponível no navegador.');return false}}
 const paths={dashboard:'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',produtos:'m3 7 9-4 9 4-9 5z M3 7v10l9 5 9-5V7 M12 12v10',metas:'M21 12a9 9 0 1 1-9-9 M17 12a5 5 0 1 1-5-5 M12 12l9-9',orcamento:'M3 6h18v14H3z M3 6l14-4v4 M16 11h5v4h-5z',calendario:'M3 6h18v15H3z M7 3v6m10-6v6M3 11h18',historico:'M3 11a9 9 0 1 1 2 7M3 5v6h6 M12 7v6l4 2',categorias:'M3 5h7l2 3h9v12H3z',ferramentas:'M5 3h14v18H5z M8 7h8 M8 12h2m4 0h2m-8 5h2m4 0h2',check:'m4 12 5 5 11-12'};
 const icon=k=>'<svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="'+paths[k]+'"/></svg>';
 const pages={dashboard:'Dashboard',produtos:'Lista de desejos',metas:'Metas financeiras',orcamento:'Orçamento mensal',calendario:'Calendário',historico:'Histórico de compras',categorias:'Categorias',ferramentas:'Ferramentas'};
@@ -118,7 +151,7 @@ async function photoData(file){const bitmap=await createImageBitmap(file);const 
 function readOffers(){return [...document.querySelectorAll('.offer')].map(row=>{const [store,url,price]=row.querySelectorAll('input');return {store:store.value.trim(),url:url.value.trim(),price:Number(price.value)}})}
 $('#form').onsubmit=async e=>{
  e.preventDefault();const f=new FormData(e.target),v=k=>String(f.get(k)||'').trim(),n=k=>Number(v(k)),offers=readOffers();
- if(!v('name')||offers.some(o=>!safe(o.url)||!o.store)||v('img')&&!safe(v('img')))return alert('Confira o nome do produto, as lojas e os links HTTP ou HTTPS.');
+ if(!v('name')||offers.some(o=>!safe(o.url)||!o.store)||v('img')&&!safe(v('img')))return await notifyUser('Confira o nome do produto, as lojas e os links HTTP ou HTTPS.');
  const submit=e.target.querySelector('.primary');submit.disabled=true;
  try{
  let img=v('img')||(editing?.img.startsWith('data:')?editing.img:'');const file=f.get('photo');if(file.size)img=await photoData(file);
@@ -126,7 +159,7 @@ $('#form').onsubmit=async e=>{
  if(!old||old.price!==x.price||!old.log.length){if(old&&old.price!==x.price&&!old.log.length)x.log.push({label:'Preço anterior',date:'',price:old.price});x.log.push({label:'Produto',date:today(),price:x.price})}
  for(const o of offers){if(!old?.offers.some(a=>a.url===o.url&&a.store===o.store&&a.price===o.price))x.log.push({label:o.store,date:today(),price:o.price})}
  if(await save({...state,items:old?state.items.map(i=>i.id===old.id?x:i):[x,...state.items]})){$('dialog').close();render()}
- }catch{alert('Não foi possível ler a foto ou salvar o produto.')}finally{submit.disabled=false}
+ }catch{await notifyUser('Não foi possível ler a foto ou salvar o produto.')}finally{submit.disabled=false}
 };
 function validateBackup(s){
  const num=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0;
@@ -134,11 +167,11 @@ function validateBackup(s){
  if(!s||s.version!==2||!Array.isArray(s.cats)||!s.cats.length||!s.cats.every(c=>string(c)&&c.trim())||new Set(s.cats).size!==s.cats.length||!Array.isArray(s.items)||!s.budgets||typeof s.budgets!=='object'||Array.isArray(s.budgets)||!Object.entries(s.budgets).every(([k,v])=>/^\d{4}-\d{2}$/.test(k)&&num(v)))return false;
  return new Set(s.items.map(x=>x.id)).size===s.items.length&&s.items.every(x=>x&&['id','name','notes','img'].every(k=>string(x[k]))&&x.name.trim()&&s.cats.includes(x.cat)&&priorities.includes(x.priority)&&statuses.includes(x.status)&&['target','saved','monthly','price','qty'].every(k=>num(x[k]))&&x.price>0&&Number.isInteger(x.qty)&&x.qty>0&&['goal','favorite'].every(k=>typeof x[k]==='boolean')&&date(x.date)&&date(x.bought)&&Array.isArray(x.offers)&&x.offers.every(o=>o&&string(o.store)&&safe(o.url)&&num(o.price))&&Array.isArray(x.log)&&x.log.every(o=>o&&string(o.label)&&date(o.date)&&num(o.price)));
 }
-async function importFile(file){try{const next=JSON.parse(await file.text());if(!validateBackup(next))throw Error();if(confirm('Substituir o planejamento aberto pelos dados do backup?')&&await save(next))render()}catch{alert('Arquivo de backup inválido. Os dados atuais foram preservados.')}}
+async function importFile(file){try{const next=JSON.parse(await file.text());if(!validateBackup(next))throw Error();if(await confirmChange('Restaurar backup?', 'Os dados do arquivo vão substituir o planejamento aberto.', 'Restaurar backup')&&await save(next))render()}catch{await notifyUser('Arquivo de backup inválido. Os dados atuais foram preservados.')}}
 async function manageCat(a,c){
  let cats=[...state.cats],items=state.items;
- if(a==='catdel'){if(cats.length===1)return alert('Mantenha pelo menos uma categoria.');cats=cats.filter(v=>v!==c);const destination=cats.includes('Outros')?'Outros':cats[0];if(!confirm('Excluir '+c+' e mover seus produtos para '+destination+'?'))return;items=items.map(x=>x.cat===c?{...x,cat:destination}:x)}
- else{const v=prompt('Nome da categoria',a==='catrename'?c:'')?.trim();if(!v||v===c)return;if(cats.some(n=>n.toLowerCase()===v.toLowerCase()))return alert('Essa categoria já existe.');if(a==='catadd')cats.push(v);else{cats=cats.map(n=>n===c?v:n);items=items.map(x=>x.cat===c?{...x,cat:v}:x)}}
+ if(a==='catdel'){if(cats.length===1)return await notifyUser('Mantenha pelo menos uma categoria.');cats=cats.filter(v=>v!==c);const destination=cats.includes('Outros')?'Outros':cats[0];if(!await confirmChange('Excluir categoria?', 'Os produtos de “'+c+'” serão movidos para “'+destination+'”.', 'Excluir categoria'))return;items=items.map(x=>x.cat===c?{...x,cat:destination}:x)}
+ else{const v=(await showMessage({title:a==='catrename'?'Renomear categoria':'Criar categoria',message:'Escolha um nome para organizar seus produtos.',confirmLabel:a==='catrename'?'Salvar nome':'Criar categoria',cancellable:true,inputValue:a==='catrename'?c:''}))?.trim();if(!v||v===c)return;if(cats.some(n=>n.toLowerCase()===v.toLowerCase()))return await notifyUser('Essa categoria já existe.');if(a==='catadd')cats.push(v);else{cats=cats.map(n=>n===c?v:n);items=items.map(x=>x.cat===c?{...x,cat:v}:x)}}
  if(await save({...state,cats,items})){filters.cat='';render()}
 }
 document.addEventListener('click',async e=>{
@@ -147,7 +180,7 @@ document.addEventListener('click',async e=>{
  if(a==='new')edit(null);
  if(a==='edit')edit(id);
  if(a==='close')$('dialog').close();
- if(a==='delete'&&editing&&confirm('Excluir este produto e seu histórico?')&&await save({...state,items:state.items.filter(x=>x.id!==editing.id)})){$('dialog').close();render()}
+ if(a==='delete'&&editing&&await confirmChange(editing.goal?'Excluir meta?':'Excluir produto?', '“'+editing.name+'” e seu histórico serão excluídos permanentemente.', editing.goal?'Excluir meta':'Excluir produto')&&await save({...state,items:state.items.filter(x=>x.id!==editing.id)})){$('dialog').close();render()}
  if(a==='addoffer')$('#offers').insertAdjacentHTML('beforeend',offerRow());
  if(a==='removeoffer'){b.closest('.offer').remove();updateCompare()}
  if(a==='fav'&&await save({...state,items:state.items.map(x=>x.id===id?{...x,favorite:!x.favorite}:x)})){
