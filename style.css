@@ -67,3 +67,24 @@ button:disabled { cursor:default; }
   .card:hover,.card:hover .art img,button:active:not(:disabled) { transform:none; }
   .card:hover .art > svg { transform:rotate(-7deg); }
 }
+
+.feedback-dialog {
+ width:min(26rem,calc(100vw - 2rem)); padding:clamp(1.25rem,5vw,2rem);
+ background:linear-gradient(145deg,#30263c,#201c29 65%); color:#f5f0fb;
+ border:1px solid #665273; border-radius:20px; box-shadow:0 24px 90px #08051099;
+}
+.feedback-dialog::backdrop {background:#0a0811b8;backdrop-filter:blur(3px)}
+.feedback-icon {
+ display:grid;place-items:center;width:2.7rem;height:2.7rem;border-radius:14px;
+ background:#433454;color:#ddbdff;border:1px solid #604875;font-size:1.45rem;font-weight:700;
+}
+.feedback-dialog.danger .feedback-icon {background:#482b38;color:#ffb4bc;border-color:#71404c}
+.feedback-dialog h2 {margin:1rem 0 .45rem;line-height:1.2;font-size:1.45rem}
+.feedback-dialog p {margin:0;color:#d8cfdf;line-height:1.55;overflow-wrap:anywhere}
+.feedback-dialog label {margin-top:1rem;display:grid;gap:.4rem}
+.feedback-dialog [hidden] {display:none}
+.feedback-actions {display:flex;justify-content:flex-end;flex-wrap:wrap;gap:.6rem;margin-top:1.5rem}
+.feedback-actions button {min-height:42px;padding:.55rem 1rem;border-radius:10px}
+.feedback-actions .accept {background:#c29aff;color:#201331;border-color:transparent;font-weight:700}
+.feedback-dialog.danger .accept {background:#f3a0ac;color:#32131a}
+.feedback-actions button:focus-visible,.feedback-dialog input:focus-visible {outline:2px solid #dfc7ff;outline-offset:3px}
